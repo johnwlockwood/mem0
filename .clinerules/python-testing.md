@@ -25,6 +25,12 @@
 - Use pytest fixtures for common test data
 - Mock external services (OpenAI, Qdrant, etc.)
 
+### Test Execution
+- All tests must be run using:
+  ```bash
+  poetry run pytest tests
+  ```
+
 ### Test Coverage
 - Minimum 85% branch coverage
 - 100% coverage for:
