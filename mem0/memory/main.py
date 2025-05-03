@@ -2,7 +2,6 @@ import asyncio
 import concurrent
 import gc
 import hashlib
-import json
 import logging
 import os
 import uuid
@@ -25,9 +24,9 @@ from mem0.memory.storage import SQLiteManager
 from mem0.memory.telemetry import capture_event
 from mem0.memory.utils import (
     get_fact_retrieval_messages,
+    isolate_json_object,
     parse_messages,
     parse_vision_messages,
-    remove_code_blocks,
 )
 from mem0.utils.factory import EmbedderFactory, LlmFactory, VectorStoreFactory
 
@@ -227,10 +226,14 @@ class Memory(MemoryBase):
         )
 
         try:
-            response = remove_code_blocks(response)
-            new_retrieved_facts = json.loads(response)["facts"]
+            parsed_response = isolate_json_object(response)
+            if parsed_response and isinstance(parsed_response, dict) and "facts" in parsed_response:
+                new_retrieved_facts = parsed_response["facts"]
+            else:
+                logging.error(f"Failed to parse facts from LLM response: {response}")
+                new_retrieved_facts = []
         except Exception as e:
-            logging.error(f"Error in new_retrieved_facts: {e}")
+            logging.error(f"Error processing LLM response for facts: {e}")
             new_retrieved_facts = []
 
         retrieved_old_memory = []
@@ -272,11 +275,15 @@ class Memory(MemoryBase):
             new_memories_with_actions = []
 
         try:
-            new_memories_with_actions = remove_code_blocks(new_memories_with_actions)
-            new_memories_with_actions = json.loads(new_memories_with_actions)
+            parsed_actions = isolate_json_object(new_memories_with_actions)
+            if parsed_actions and isinstance(parsed_actions, dict):
+                new_memories_with_actions = parsed_actions
+            else:
+                logging.error(f"Failed to parse memory actions from LLM response: {new_memories_with_actions}")
+                new_memories_with_actions = {}  # Use empty dict instead of list
         except Exception as e:
-            logging.error(f"Invalid JSON response: {e}")
-            new_memories_with_actions = []
+            logging.error(f"Error processing LLM response for memory actions: {e}")
+            new_memories_with_actions = {}  # Use empty dict instead of list
 
         returned_memories = []
         try:
@@ -767,13 +774,13 @@ class Memory(MemoryBase):
         logger.warning("Resetting all memories")
 
         # Close the old connection if possible
-        if hasattr(self.db, 'connection') and self.db.connection:
-                self.db.connection.execute("DROP TABLE IF EXISTS history")
-                self.db.connection.close()
+        if hasattr(self.db, "connection") and self.db.connection:
+            self.db.connection.execute("DROP TABLE IF EXISTS history")
+            self.db.connection.close()
 
         self.db = SQLiteManager(self.config.history_db_path)
 
-        if hasattr(self.vector_store, 'reset'):
+        if hasattr(self.vector_store, "reset"):
             self.vector_store = VectorStoreFactory.reset(self.vector_store)
         else:
             logger.warning("Vector store does not support reset. Skipping.")
@@ -960,10 +967,14 @@ class AsyncMemory(MemoryBase):
         )
 
         try:
-            response = remove_code_blocks(response)
-            new_retrieved_facts = json.loads(response)["facts"]
+            parsed_response = isolate_json_object(response)
+            if parsed_response and isinstance(parsed_response, dict) and "facts" in parsed_response:
+                new_retrieved_facts = parsed_response["facts"]
+            else:
+                logging.error(f"Failed to parse facts from LLM response: {response}")
+                new_retrieved_facts = []
         except Exception as e:
-            logging.error(f"Error in new_retrieved_facts: {e}")
+            logging.error(f"Error processing LLM response for facts: {e}")
             new_retrieved_facts = []
 
         retrieved_old_memory = []
@@ -1017,11 +1028,15 @@ class AsyncMemory(MemoryBase):
             new_memories_with_actions = []
 
         try:
-            new_memories_with_actions = remove_code_blocks(new_memories_with_actions)
-            new_memories_with_actions = json.loads(new_memories_with_actions)
+            parsed_actions = isolate_json_object(new_memories_with_actions)
+            if parsed_actions and isinstance(parsed_actions, dict):
+                new_memories_with_actions = parsed_actions
+            else:
+                logging.error(f"Failed to parse memory actions from LLM response: {new_memories_with_actions}")
+                new_memories_with_actions = {}  # Use empty dict instead of list
         except Exception as e:
-            logging.error(f"Invalid JSON response: {e}")
-            new_memories_with_actions = []
+            logging.error(f"Error processing LLM response for memory actions: {e}")
+            new_memories_with_actions = {}  # Use empty dict instead of list
 
         returned_memories = []
         try:
@@ -1092,7 +1107,9 @@ class AsyncMemory(MemoryBase):
         except Exception as e:
             logging.error(f"Error in new_memories_with_actions: {e}")
 
-        capture_event("mem0.add", self, {"version": self.api_version, "keys": list(filters.keys()), "sync_type": "async"})
+        capture_event(
+            "mem0.add", self, {"version": self.api_version, "keys": list(filters.keys()), "sync_type": "async"}
+        )
 
         return returned_memories
 
@@ -1547,10 +1564,10 @@ class AsyncMemory(MemoryBase):
 
         gc.collect()
 
-        if hasattr(self.vector_store, 'client') and hasattr(self.vector_store.client, 'close'):
+        if hasattr(self.vector_store, "client") and hasattr(self.vector_store.client, "close"):
             await asyncio.to_thread(self.vector_store.client.close)
 
-        if hasattr(self.db, 'connection') and self.db.connection:
+        if hasattr(self.db, "connection") and self.db.connection:
             await asyncio.to_thread(lambda: self.db.connection.execute("DROP TABLE IF EXISTS history"))
             await asyncio.to_thread(self.db.connection.close)
 

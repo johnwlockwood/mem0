@@ -1,4 +1,5 @@
-import re
+import json
+from typing import Any
 
 from mem0.configs.prompts import FACT_RETRIEVAL_PROMPT
 
@@ -31,18 +32,73 @@ def format_entities(entities):
     return "\n".join(formatted_lines)
 
 
-def remove_code_blocks(content: str) -> str:
+def isolate_json_object(content: str) -> Any | None:
     """
-    Removes enclosing code block markers ```[language] and ``` from a given string.
+    Isolates and parses the first valid JSON object or array found within a string.
 
-    Remarks:
-    - The function uses a regex pattern to match code blocks that may start with ``` followed by an optional language tag (letters or numbers) and end with ```.
-    - If a code block is detected, it returns only the inner content, stripping out the markers.
-    - If no code block markers are found, the original content is returned as-is.
+    Handles JSON embedded within other text, code blocks, or reasoning blocks.
+
+    Args:
+        content: The input string potentially containing a JSON object or array.
+
+    Returns:
+        The parsed JSON object/array if found and valid, otherwise None.
     """
-    pattern = r"^```[a-zA-Z0-9]*\n([\s\S]*?)\n```$"
-    match = re.match(pattern, content.strip())
-    return match.group(1).strip() if match else content.strip()
+    content = content.strip()
+
+    # Find the first potential start of a JSON object or array
+    first_brace = content.find("{")
+    first_bracket = content.find("[")
+
+    start_index = -1
+    start_char = ""
+
+    if first_brace == -1 and first_bracket == -1:
+        return None  # No JSON object/array start found
+    elif first_brace == -1:
+        start_index = first_bracket
+        start_char = "["
+    elif first_bracket == -1:
+        start_index = first_brace
+        start_char = "{"
+    else:
+        start_index = min(first_brace, first_bracket)
+        start_char = "{" if start_index == first_brace else "["
+
+    end_char = "}" if start_char == "{" else "]"
+
+    brace_level = 0
+    in_string = False
+    escape_next = False
+
+    for i in range(start_index, len(content)):
+        char = content[i]
+
+        if in_string:
+            if escape_next:
+                escape_next = False
+            elif char == "\\":
+                escape_next = True
+            elif char == '"':
+                in_string = False
+        elif char == '"':
+            in_string = True
+        elif char == start_char:
+            brace_level += 1
+        elif char == end_char:
+            brace_level -= 1
+            if brace_level == 0:
+                # Found the potential end of the JSON object/array
+                potential_json = content[start_index : i + 1]
+                try:
+                    return json.loads(potential_json)
+                except json.JSONDecodeError:
+                    # If parsing fails, it might not be the correct end, continue searching
+                    # Or it could be invalid JSON, in which case we'll eventually return None
+                    pass  # Continue the loop to find a potentially larger valid JSON
+
+    # If we reach here, no valid JSON object/array was found and parsed
+    return None
 
 
 def get_image_description(image_obj, llm, vision_details):
