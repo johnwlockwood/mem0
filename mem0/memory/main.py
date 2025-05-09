@@ -208,6 +208,22 @@ class Memory(MemoryBase):
 
         return {"results": vector_store_result}
 
+    def _generate_fact_retrieval_response(self, system_prompt: str, user_prompt: str) -> str:
+        """Generate LLM response for fact retrieval.
+        Args:
+            system_prompt: System prompt for the LLM
+            user_prompt: User prompt for the LLM
+        Returns:
+            str: Raw LLM response
+        """
+        return self.llm.generate_response(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
+        )
+
     def _do_fact_retrieval(self, messages, filters):
         """Extract facts from messages using LLM"""
         parsed_messages = parse_messages(messages)
@@ -218,13 +234,7 @@ class Memory(MemoryBase):
         else:
             system_prompt, user_prompt = get_fact_retrieval_messages(parsed_messages)
 
-        response = self.llm.generate_response(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format={"type": "json_object"},
-        )
+        response = self._generate_fact_retrieval_response(system_prompt, user_prompt)
 
         try:
             response = remove_code_blocks(response)
@@ -254,20 +264,29 @@ class Memory(MemoryBase):
 
         return new_retrieved_facts, retrieved_old_memory, temp_uuid_mapping, new_message_embeddings
 
+    def _generate_memory_actions_response(self, function_calling_prompt: str) -> str:
+        """Generate LLM response for memory actions.
+        Args:
+            function_calling_prompt: Prompt for memory actions
+        Returns:
+            str: Raw LLM response
+        """
+        try:
+            return self.llm.generate_response(
+                messages=[{"role": "user", "content": function_calling_prompt}],
+                response_format={"type": "json_object"},
+            )
+        except Exception as e:
+            logging.error(f"Error in new memory actions response: {e}")
+            return ""
+
     def _get_memory_actions(self, retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata):
         """Get memory actions (ADD/UPDATE/DELETE) from LLM"""
         function_calling_prompt = get_update_memory_messages(
             retrieved_old_memory, new_retrieved_facts, self.config.custom_update_memory_prompt
         )
 
-        try:
-            response: str = self.llm.generate_response(
-                messages=[{"role": "user", "content": function_calling_prompt}],
-                response_format={"type": "json_object"},
-            )
-        except Exception as e:
-            logging.error(f"Error in new memory actions response: {e}")
-            response = ""
+        response = self._generate_memory_actions_response(function_calling_prompt)
 
         try:
             response = remove_code_blocks(response)
@@ -969,6 +988,23 @@ class AsyncMemory(MemoryBase):
 
         return {"results": vector_store_result}
 
+    async def _generate_fact_retrieval_response(self, system_prompt: str, user_prompt: str) -> str:
+        """Generate LLM response for fact retrieval asynchronously.
+        Args:
+            system_prompt: System prompt for the LLM
+            user_prompt: User prompt for the LLM
+        Returns:
+            str: Raw LLM response
+        """
+        return await asyncio.to_thread(
+            self.llm.generate_response,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
+        )
+
     async def _do_fact_retrieval(self, messages, filters):
         """Extract facts from messages using LLM asynchronously"""
         parsed_messages = parse_messages(messages)
@@ -979,14 +1015,7 @@ class AsyncMemory(MemoryBase):
         else:
             system_prompt, user_prompt = get_fact_retrieval_messages(parsed_messages)
 
-        response = await asyncio.to_thread(
-            self.llm.generate_response,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format={"type": "json_object"},
-        )
+        response = await self._generate_fact_retrieval_response(system_prompt, user_prompt)
 
         try:
             response = remove_code_blocks(response)
@@ -1054,21 +1083,30 @@ class AsyncMemory(MemoryBase):
 
         return returned_memories
 
-    async def _get_memory_actions(self, retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata):
-        """Get memory actions (ADD/UPDATE/DELETE) from LLM asynchronously"""
-        function_calling_prompt = get_update_memory_messages(
-            retrieved_old_memory, new_retrieved_facts, self.config.custom_update_memory_prompt
-        )
-
+    async def _generate_memory_actions_response(self, function_calling_prompt: str) -> str:
+        """Generate LLM response for memory actions asynchronously.
+        Args:
+            function_calling_prompt: Prompt for memory actions
+        Returns:
+            str: Raw LLM response
+        """
         try:
-            response: str = await asyncio.to_thread(
+            return await asyncio.to_thread(
                 self.llm.generate_response,
                 messages=[{"role": "user", "content": function_calling_prompt}],
                 response_format={"type": "json_object"},
             )
         except Exception as e:
             logging.error(f"Error in new memory actions response: {e}")
-            response = ""
+            return ""
+
+    async def _get_memory_actions(self, retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata):
+        """Get memory actions (ADD/UPDATE/DELETE) from LLM asynchronously"""
+        function_calling_prompt = get_update_memory_messages(
+            retrieved_old_memory, new_retrieved_facts, self.config.custom_update_memory_prompt
+        )
+
+        response = await self._generate_memory_actions_response(function_calling_prompt)
 
         try:
             response = remove_code_blocks(response)

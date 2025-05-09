@@ -205,13 +205,17 @@ class TestAddMemory:
     @pytest.fixture
     def mock_memory(self, mocker):
         """Fixture that returns a Memory instance with mocker-based mocks"""
-        mock_llm, _ = _setup_mocks(mocker)
+        _, mock_vector_store = _setup_mocks(mocker)
 
         memory = Memory()
         memory.config = mocker.MagicMock()
         memory.config.custom_fact_extraction_prompt = None
         memory.config.custom_update_memory_prompt = None
         memory.api_version = "v1.1"
+        
+        # Mock the new response generation methods
+        memory._generate_fact_retrieval_response = mocker.MagicMock()
+        memory._generate_memory_actions_response = mocker.MagicMock()
 
         return memory
 
@@ -231,7 +235,8 @@ class TestAddMemory:
         mock_memory.vector_store.search.return_value = [mock_search(key) for key in memory_payload.keys()]
         mock_memory.vector_store.update.side_effect = mock_update
 
-        mock_memory.llm.generate_response.side_effect = llm_responses
+        mock_memory._generate_fact_retrieval_response.return_value = llm_responses[0]
+        mock_memory._generate_memory_actions_response.return_value = llm_responses[1]
 
         with caplog.at_level(logging.ERROR):
             add_result = mock_memory.add(
@@ -242,8 +247,8 @@ class TestAddMemory:
                 filters={},
                 infer=True,
             )
-
-        assert mock_memory.llm.generate_response.call_count == 2
+        assert mock_memory._generate_fact_retrieval_response.call_count == 1
+        assert mock_memory._generate_memory_actions_response.call_count == 1
         assert add_result is not None
         assert "results" in add_result
         results = add_result["results"]
@@ -354,7 +359,8 @@ class TestAddMemory:
         mock_memory.vector_store.get.side_effect = mock_get
         mock_memory.vector_store.search.return_value = [mock_search(key) for key in memory_payload.keys()]
 
-        mock_memory.llm.generate_response.side_effect = ["", ""]
+        mock_memory._generate_fact_retrieval_response.return_value = ""
+        mock_memory._generate_memory_actions_response.return_value = ""
 
         with caplog.at_level(logging.ERROR):
             add_result = mock_memory.add(
@@ -366,7 +372,8 @@ class TestAddMemory:
                 infer=True,
             )
 
-        assert mock_memory.llm.generate_response.call_count == 2
+        assert mock_memory._generate_fact_retrieval_response.call_count == 1
+        assert mock_memory._generate_memory_actions_response.call_count == 1
         assert add_result is not None
         assert "results" in add_result
         results = add_result["results"]
@@ -382,13 +389,17 @@ class TestAsyncAddMemory:
     @pytest.fixture
     def mock_async_memory(self, mocker):
         """Fixture for AsyncMemory with mocker-based mocks"""
-        mock_llm, _ = _setup_mocks(mocker)
+        _, mock_vector_store = _setup_mocks(mocker)
 
         memory = AsyncMemory()
         memory.config = mocker.MagicMock()
         memory.config.custom_fact_extraction_prompt = None
         memory.config.custom_update_memory_prompt = None
         memory.api_version = "v1.1"
+
+        # Mock the new async response generation methods
+        memory._generate_fact_retrieval_response = mocker.AsyncMock()
+        memory._generate_memory_actions_response = mocker.AsyncMock()
 
         return memory
 
@@ -411,7 +422,8 @@ class TestAsyncAddMemory:
         mock_async_memory.vector_store.search.return_value = [mock_search(key) for key in memory_payload.keys()]
         mock_async_memory.vector_store.update.side_effect = mock_update
 
-        mock_async_memory.llm.generate_response.side_effect = llm_responses
+        mock_async_memory._generate_fact_retrieval_response.return_value = llm_responses[0]
+        mock_async_memory._generate_memory_actions_response.return_value = llm_responses[1]
 
         with caplog.at_level(logging.ERROR):
             add_result = await mock_async_memory.add(
@@ -423,7 +435,8 @@ class TestAsyncAddMemory:
                 infer=True,
             )
 
-        assert mock_async_memory.llm.generate_response.call_count == 2
+        assert mock_async_memory._generate_fact_retrieval_response.call_count == 1
+        assert mock_async_memory._generate_memory_actions_response.call_count == 1
         assert add_result is not None
         assert "results" in add_result
         results = add_result["results"]
@@ -538,7 +551,8 @@ class TestAsyncAddMemory:
         mock_async_memory.vector_store.search.return_value = [mock_search(key) for key in memory_payload.keys()]
 
         mocker.patch("mem0.utils.factory.EmbedderFactory.create", return_value=MagicMock())
-        mock_async_memory.llm.generate_response.side_effect = ["", ""]
+        mock_async_memory._generate_fact_retrieval_response.return_value = ""
+        mock_async_memory._generate_memory_actions_response.return_value = ""
 
         with caplog.at_level(logging.ERROR):
             add_result = await mock_async_memory.add(
@@ -549,8 +563,8 @@ class TestAsyncAddMemory:
                 filters={},
                 infer=True,
             )
-
-        assert mock_async_memory.llm.generate_response.call_count == 2
+        assert mock_async_memory._generate_fact_retrieval_response.call_count == 1
+        assert mock_async_memory._generate_memory_actions_response.call_count == 1
         assert add_result is not None
         assert "results" in add_result
         results = add_result["results"]
