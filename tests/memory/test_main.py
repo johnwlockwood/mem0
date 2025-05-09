@@ -196,7 +196,29 @@ def base_memory_scenario():
         }
     )
 
-    return relevant_existing_memories, fact_extraction_response, memory_actions_response, id_mapping, message_from_user
+    expected_memory_updates = [
+        {
+            "id": "5e6c2501-095c-49b4-8e59-348cf6745f1d",
+            "memory": "I like rice and beans and cheese",
+            "event": "UPDATE",
+            "previous_memory": "I like rice and beans",
+        },
+        {"memory": "Likes pizza", "event": "DELETE", "id": "be6c8333-2e75-4177-a9b6-6a2a5d75dd32"},
+        {"memory": "Likes tacos", "event": "ADD"},
+        {"memory": "Likes Tuesdays", "event": "ADD"},
+        {"memory": "Likes Potatoes", "event": "ADD"},
+        {"memory": "Likes Pineapple", "event": "ADD"},
+        {"memory": "Likes T-Shirts", "event": "ADD"},
+    ]
+
+    return (
+        relevant_existing_memories, 
+        fact_extraction_response, 
+        memory_actions_response, 
+        id_mapping, 
+        message_from_user,
+        expected_memory_updates
+    )
 
 
 class TestMemoryLLMCalls:
@@ -282,7 +304,7 @@ class TestMemoryLLMCalls:
             messages=[{"role": "user", "content": function_calling_prompt}], response_format={"type": "json_object"}
         )
 
-def assert_add_result(add_result, expected_results):
+def assert_add_result(add_result, expected_memory_updates):
     """Helper to assert the add result against expected results"""
     assert add_result is not None
     assert "results" in add_result
@@ -297,9 +319,9 @@ def assert_add_result(add_result, expected_results):
             testing_result["id"] = result["id"]
         unordered_results.append(testing_result)
 
-    assert len(unordered_results) == len(expected_results)
+    assert len(unordered_results) == len(expected_memory_updates)
     assert sorted(unordered_results, key=lambda x: x["event"] + x["memory"]) == sorted(
-        expected_results, key=lambda x: x["event"] + x["memory"]
+        expected_memory_updates, key=lambda x: x["event"] + x["memory"]
     )
 
 
@@ -324,7 +346,7 @@ class TestAddMemory:
 
     def test_valid_llm_response_fact_extraction(self, mock_memory, caplog, base_memory_scenario):
         """Test valid response from LLM during fact extraction"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = (
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_memory_updates = (
             base_memory_scenario
         )
 
@@ -352,21 +374,7 @@ class TestAddMemory:
                 filters={},
                 infer=True,
             )
-        expected_unordered_results = [
-            {
-                "id": "5e6c2501-095c-49b4-8e59-348cf6745f1d",
-                "memory": "I like rice and beans and cheese",
-                "event": "UPDATE",
-                "previous_memory": "I like rice and beans",
-            },
-            {"memory": "Likes pizza", "event": "DELETE", "id": "be6c8333-2e75-4177-a9b6-6a2a5d75dd32"},
-            {"memory": "Likes tacos", "event": "ADD"},
-            {"memory": "Likes Tuesdays", "event": "ADD"},
-            {"memory": "Likes Potatoes", "event": "ADD"},
-            {"memory": "Likes Pineapple", "event": "ADD"},
-            {"memory": "Likes T-Shirts", "event": "ADD"},
-        ]
-        assert_add_result(add_result, expected_unordered_results)
+        assert_add_result(add_result, expected_memory_updates)
         
         assert mock_memory._generate_fact_retrieval_response.call_count == 1
         assert mock_memory._generate_memory_actions_response.call_count == 1
@@ -441,7 +449,7 @@ class TestAddMemory:
 
     def test_generate_fact_retrieval_response_called(self, mock_memory, base_memory_scenario):
         """Test that _generate_fact_retrieval_response is called with expected arguments"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = (
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_memory_updates = (
             base_memory_scenario
         )
 
@@ -466,7 +474,7 @@ class TestAddMemory:
 
     def test_generate_memory_actions_response_called(self, mock_memory, base_memory_scenario):
         """Test that _generate_memory_actions_response is called with expected arguments"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = (
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_memory_updates = (
             base_memory_scenario
         )
 
@@ -493,7 +501,7 @@ class TestAddMemory:
         Sometimes the LLM doesn't return a valid JSON response
         and we need to handle that gracefully.
         """
-        memory_payload, _, _, id_mapping, message_from_user = base_memory_scenario
+        memory_payload, _, _, id_mapping, message_from_user, _ = base_memory_scenario
 
         from functools import partial
 
@@ -551,7 +559,7 @@ class TestAsyncAddMemory:
         self, mock_async_memory, caplog, mocker, base_memory_scenario
     ):
         """Test valid response in AsyncMemory.add"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = (
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_memory_updates = (
             base_memory_scenario
         )
 
@@ -580,39 +588,10 @@ class TestAsyncAddMemory:
                 infer=True,
             )
 
+        assert_add_result(add_result, expected_memory_updates)
+
         assert mock_async_memory._generate_fact_retrieval_response.call_count == 1
         assert mock_async_memory._generate_memory_actions_response.call_count == 1
-        assert add_result is not None
-        assert "results" in add_result
-        results = add_result["results"]
-        unordered_results = []
-        for result in results:
-            testing_result = {"memory": result["memory"], "event": result["event"]}
-            if result["event"] == "UPDATE":
-                testing_result["previous_memory"] = result["previous_memory"]
-                testing_result["id"] = result["id"]
-            if result["event"] == "DELETE":
-                testing_result["id"] = result["id"]
-            unordered_results.append(testing_result)
-
-        assert len(unordered_results) == 7
-        expected_unordered_results = [
-            {
-                "id": "5e6c2501-095c-49b4-8e59-348cf6745f1d",
-                "memory": "I like rice and beans and cheese",
-                "event": "UPDATE",
-                "previous_memory": "I like rice and beans",
-            },
-            {"memory": "Likes pizza", "event": "DELETE", "id": "be6c8333-2e75-4177-a9b6-6a2a5d75dd32"},
-            {"memory": "Likes tacos", "event": "ADD"},
-            {"memory": "Likes Tuesdays", "event": "ADD"},
-            {"memory": "Likes Potatoes", "event": "ADD"},
-            {"memory": "Likes Pineapple", "event": "ADD"},
-            {"memory": "Likes T-Shirts", "event": "ADD"},
-        ]
-        assert sorted(unordered_results, key=lambda x: x["event"] + x["memory"]) == sorted(
-            expected_unordered_results, key=lambda x: x["event"] + x["memory"]
-        )
         # Check update calls unordered
         expected_update_call_values = [
             {
@@ -685,7 +664,7 @@ class TestAsyncAddMemory:
     @pytest.mark.asyncio
     async def test_async_generate_fact_retrieval_response_called(self, mock_async_memory, base_memory_scenario):
         """Test that _generate_fact_retrieval_response is called with expected arguments in async mode"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = (
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, _ = (
             base_memory_scenario
         )
 
@@ -711,7 +690,7 @@ class TestAsyncAddMemory:
     @pytest.mark.asyncio
     async def test_async_generate_memory_actions_response_called(self, mock_async_memory, base_memory_scenario):
         """Test that _generate_memory_actions_response is called with expected arguments in async mode"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = (
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, _ = (
             base_memory_scenario
         )
 
@@ -741,7 +720,7 @@ class TestAsyncAddMemory:
         Sometimes the LLM doesn't return a valid JSON response
         and we need to handle that gracefully.
         """
-        memory_payload, _, _, id_mapping, message_from_user = base_memory_scenario
+        memory_payload, _, _, id_mapping, message_from_user, _ = base_memory_scenario
 
         from functools import partial
 
