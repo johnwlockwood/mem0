@@ -76,35 +76,35 @@ def create_mock_scored_point(memory_payload, vector_id):
 
 @pytest.fixture
 def base_memory_scenario():
-    """Returns (relevant_existing_memories, llm_responses, id_mapping, message_from_user)
+    """Returns a complete test scenario for memory operations including:
+    - Pre-existing memories
+    - LLM responses
+    - ID mapping
+    - User input
+    - Expected results
+    
+    Returns tuple of:
+    1. relevant_existing_memories: Dict of memory UUIDs to their payload data
+    2. fact_extraction_response: Mock LLM response for fact extraction phase
+    3. memory_actions_response: Mock LLM response for memory actions phase  
+    4. id_mapping: Dict mapping simple IDs (0,1,2) to actual UUIDs
+    5. message_from_user: Input message that triggers the memory operations
+    6. expected_add_results: Expected results from memory.add()
+    7. expected_update_call_values: Expected vector store update calls
+    8. expected_delete_call_values: Expected vector store delete calls
+    9. expected_insert_call_values: Expected vector store insert calls
 
-    The ID mapping serves an important purpose in the memory system.
-    Here's a clearer explanation of why and how it's used:
+    The ID mapping serves an important purpose:
+    1. UUIDs are permanent identifiers in the vector store
+    2. LLMs may generate invalid UUIDs during processing
+    3. Mapping provides stable reference between simple IDs and UUIDs
 
-    Why we need ID mapping:
-
-    1. UUIDs are the permanent identifiers for memories in the vector store
-    2. LLMs can sometimes hallucinate or generate invalid UUIDs when processing memory operations
-    3. The mapping provides a stable reference between simple numeric IDs and the actual UUIDs
-
-    How it works:
-
-    1. Before sending memory data to the LLM:
-
-    - Each memory's UUID is temporarily replaced with a simple numeric string (0, 1, 2 etc)
-    - The original UUIDs are stored in a mapping dictionary
-
-    2. When processing LLM responses:
-
-    - The simple numeric IDs in the response are mapped back to the original UUIDs
-    - This ensures all memory operations (update/delete) reference the correct items
-
-    3. For new memories (ADD operations):
-
-    - New UUIDs are generated since these are new entries
-    - The mapping isn't needed since these didn't exist previously
-
-
+    Workflow:
+    1. Fact extraction: LLM extracts facts from user message
+    2. Vector store query: Finds relevant existing memories
+    3. ID mapping: Replaces UUIDs with simple IDs for LLM processing
+    4. Memory actions: LLM determines UPDATE/DELETE/ADD operations
+    5. Execution: Operations performed using original UUIDs
     """
     relevant_existing_memories = {
         "5e6c2501-095c-49b4-8e59-348cf6745f1d": {
