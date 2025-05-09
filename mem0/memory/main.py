@@ -208,16 +208,8 @@ class Memory(MemoryBase):
 
         return {"results": vector_store_result}
 
-    def _add_to_vector_store(self, messages, metadata, filters, infer):
-        if not infer:
-            returned_memories = []
-            for message in messages:
-                if message["role"] != "system":
-                    message_embeddings = self.embedding_model.embed(message["content"], "add")
-                    memory_id = self._create_memory(message["content"], message_embeddings, metadata)
-                    returned_memories.append({"id": memory_id, "memory": message["content"], "event": "ADD"})
-            return returned_memories
-
+    def _do_fact_retrieval(self, messages, filters):
+        """Extract facts from messages using LLM"""
         parsed_messages = parse_messages(messages)
 
         if self.config.custom_fact_extraction_prompt:
@@ -260,6 +252,10 @@ class Memory(MemoryBase):
         # Create temporary mapping between UUIDs and integers for handling UUID hallucinations
         retrieved_old_memory, temp_uuid_mapping = create_uuid_mapping(retrieved_old_memory)
 
+        return new_retrieved_facts, retrieved_old_memory, temp_uuid_mapping, new_message_embeddings
+
+    def _get_memory_actions(self, retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata):
+        """Get memory actions (ADD/UPDATE/DELETE) from LLM"""
         function_calling_prompt = get_update_memory_messages(
             retrieved_old_memory, new_retrieved_facts, self.config.custom_update_memory_prompt
         )
@@ -280,6 +276,10 @@ class Memory(MemoryBase):
             logging.error(f"Invalid JSON response: {e}")
             new_memories_with_actions = {}
 
+        return new_memories_with_actions
+
+    def _process_memory_actions(self, new_memories_with_actions, temp_uuid_mapping, new_message_embeddings, metadata):
+        """Process memory actions (ADD/UPDATE/DELETE)"""
         returned_memories = []
         try:
             for resp in new_memories_with_actions.get("memory", []):
@@ -331,6 +331,29 @@ class Memory(MemoryBase):
                     logging.error(f"Error in new_memories_with_actions: {e}")
         except Exception as e:
             logging.error(f"Error in new_memories_with_actions: {e}")
+
+        return returned_memories
+
+    def _add_to_vector_store(self, messages, metadata, filters, infer):
+        if not infer:
+            returned_memories = []
+            for message in messages:
+                if message["role"] != "system":
+                    message_embeddings = self.embedding_model.embed(message["content"], "add")
+                    memory_id = self._create_memory(message["content"], message_embeddings, metadata)
+                    returned_memories.append({"id": memory_id, "memory": message["content"], "event": "ADD"})
+            return returned_memories
+
+        new_retrieved_facts, retrieved_old_memory, temp_uuid_mapping, new_message_embeddings = \
+            self._do_fact_retrieval(messages, filters)
+
+        new_memories_with_actions = self._get_memory_actions(
+            retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata
+        )
+
+        returned_memories = self._process_memory_actions(
+            new_memories_with_actions, temp_uuid_mapping, new_message_embeddings, metadata
+        )
 
         capture_event(
             "mem0.add",
@@ -946,16 +969,8 @@ class AsyncMemory(MemoryBase):
 
         return {"results": vector_store_result}
 
-    async def _add_to_vector_store(self, messages, metadata, filters, infer):
-        if not infer:
-            returned_memories = []
-            for message in messages:
-                if message["role"] != "system":
-                    message_embeddings = await asyncio.to_thread(self.embedding_model.embed, message["content"], "add")
-                    memory_id = await self._create_memory(message["content"], message_embeddings, metadata)
-                    returned_memories.append({"id": memory_id, "memory": message["content"], "event": "ADD"})
-            return returned_memories
-
+    async def _do_fact_retrieval(self, messages, filters):
+        """Extract facts from messages using LLM asynchronously"""
         parsed_messages = parse_messages(messages)
 
         if self.config.custom_fact_extraction_prompt:
@@ -1010,6 +1025,37 @@ class AsyncMemory(MemoryBase):
         # Create temporary mapping between UUIDs and integers for handling UUID hallucinations
         retrieved_old_memory, temp_uuid_mapping = create_uuid_mapping(retrieved_old_memory)
 
+        return new_retrieved_facts, retrieved_old_memory, temp_uuid_mapping, new_message_embeddings
+
+    async def _add_to_vector_store(self, messages, metadata, filters, infer):
+        if not infer:
+            returned_memories = []
+            for message in messages:
+                if message["role"] != "system":
+                    message_embeddings = await asyncio.to_thread(self.embedding_model.embed, message["content"], "add")
+                    memory_id = await self._create_memory(message["content"], message_embeddings, metadata)
+                    returned_memories.append({"id": memory_id, "memory": message["content"], "event": "ADD"})
+            return returned_memories
+
+        new_retrieved_facts, retrieved_old_memory, temp_uuid_mapping, new_message_embeddings = \
+            await self._do_fact_retrieval(messages, filters)
+
+        new_memories_with_actions = await self._get_memory_actions(
+            retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata
+        )
+
+        returned_memories = await self._process_memory_actions(
+            new_memories_with_actions, temp_uuid_mapping, new_message_embeddings, metadata
+        )
+
+        capture_event(
+            "mem0.add", self, {"version": self.api_version, "keys": list(filters.keys()), "sync_type": "async"}
+        )
+
+        return returned_memories
+
+    async def _get_memory_actions(self, retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata):
+        """Get memory actions (ADD/UPDATE/DELETE) from LLM asynchronously"""
         function_calling_prompt = get_update_memory_messages(
             retrieved_old_memory, new_retrieved_facts, self.config.custom_update_memory_prompt
         )
@@ -1031,6 +1077,10 @@ class AsyncMemory(MemoryBase):
             logging.error(f"Invalid JSON response: {e}")
             new_memories_with_actions = {}
 
+        return new_memories_with_actions
+
+    async def _process_memory_actions(self, new_memories_with_actions, temp_uuid_mapping, new_message_embeddings, metadata):
+        """Process memory actions (ADD/UPDATE/DELETE) asynchronously"""
         returned_memories = []
         try:
             memory_tasks = []
@@ -1101,10 +1151,6 @@ class AsyncMemory(MemoryBase):
 
         except Exception as e:
             logging.error(f"Error in new_memories_with_actions: {e}")
-
-        capture_event(
-            "mem0.add", self, {"version": self.api_version, "keys": list(filters.keys()), "sync_type": "async"}
-        )
 
         return returned_memories
 
