@@ -82,11 +82,11 @@ def base_memory_scenario():
     - ID mapping
     - User input
     - Expected results
-    
+
     Returns tuple of:
     1. relevant_existing_memories: Dict of memory UUIDs to their payload data
     2. fact_extraction_response: Mock LLM response for fact extraction phase
-    3. memory_actions_response: Mock LLM response for memory actions phase  
+    3. memory_actions_response: Mock LLM response for memory actions phase
     4. id_mapping: Dict mapping simple IDs (0,1,2) to actual UUIDs
     5. message_from_user: Input message that triggers the memory operations
     6. expected_add_results: Expected results from memory.add()

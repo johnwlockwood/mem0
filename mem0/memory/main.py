@@ -363,8 +363,9 @@ class Memory(MemoryBase):
                     returned_memories.append({"id": memory_id, "memory": message["content"], "event": "ADD"})
             return returned_memories
 
-        new_retrieved_facts, retrieved_old_memory, temp_uuid_mapping, new_message_embeddings = \
-            self._do_fact_retrieval(messages, filters)
+        new_retrieved_facts, retrieved_old_memory, temp_uuid_mapping, new_message_embeddings = self._do_fact_retrieval(
+            messages, filters
+        )
 
         new_memories_with_actions = self._get_memory_actions(
             retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata
@@ -1066,8 +1067,12 @@ class AsyncMemory(MemoryBase):
                     returned_memories.append({"id": memory_id, "memory": message["content"], "event": "ADD"})
             return returned_memories
 
-        new_retrieved_facts, retrieved_old_memory, temp_uuid_mapping, new_message_embeddings = \
-            await self._do_fact_retrieval(messages, filters)
+        (
+            new_retrieved_facts,
+            retrieved_old_memory,
+            temp_uuid_mapping,
+            new_message_embeddings,
+        ) = await self._do_fact_retrieval(messages, filters)
 
         new_memories_with_actions = await self._get_memory_actions(
             retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata
@@ -1117,7 +1122,9 @@ class AsyncMemory(MemoryBase):
 
         return new_memories_with_actions
 
-    async def _process_memory_actions(self, new_memories_with_actions, temp_uuid_mapping, new_message_embeddings, metadata):
+    async def _process_memory_actions(
+        self, new_memories_with_actions, temp_uuid_mapping, new_message_embeddings, metadata
+    ):
         """Process memory actions (ADD/UPDATE/DELETE) asynchronously"""
         returned_memories = []
         try:
