@@ -196,7 +196,7 @@ def base_memory_scenario():
         }
     )
 
-    expected_memory_updates = [
+    expected_add_results = [
         {
             "id": "5e6c2501-095c-49b4-8e59-348cf6745f1d",
             "memory": "I like rice and beans and cheese",
@@ -217,7 +217,7 @@ def base_memory_scenario():
         memory_actions_response, 
         id_mapping, 
         message_from_user,
-        expected_memory_updates
+        expected_add_results
     )
 
 
@@ -304,7 +304,7 @@ class TestMemoryLLMCalls:
             messages=[{"role": "user", "content": function_calling_prompt}], response_format={"type": "json_object"}
         )
 
-def assert_add_result(add_result, expected_memory_updates):
+def assert_add_result(add_result, expected_add_results):
     """Helper to assert the add result against expected results"""
     assert add_result is not None
     assert "results" in add_result
@@ -319,9 +319,9 @@ def assert_add_result(add_result, expected_memory_updates):
             testing_result["id"] = result["id"]
         unordered_results.append(testing_result)
 
-    assert len(unordered_results) == len(expected_memory_updates)
+    assert len(unordered_results) == len(expected_add_results)
     assert sorted(unordered_results, key=lambda x: x["event"] + x["memory"]) == sorted(
-        expected_memory_updates, key=lambda x: x["event"] + x["memory"]
+        expected_add_results, key=lambda x: x["event"] + x["memory"]
     )
 
 
@@ -346,7 +346,7 @@ class TestAddMemory:
 
     def test_valid_llm_response_fact_extraction(self, mock_memory, caplog, base_memory_scenario):
         """Test valid response from LLM during fact extraction"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_memory_updates = (
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_add_results = (
             base_memory_scenario
         )
 
@@ -374,7 +374,7 @@ class TestAddMemory:
                 filters={},
                 infer=True,
             )
-        assert_add_result(add_result, expected_memory_updates)
+        assert_add_result(add_result, expected_add_results)
         
         assert mock_memory._generate_fact_retrieval_response.call_count == 1
         assert mock_memory._generate_memory_actions_response.call_count == 1
@@ -449,7 +449,7 @@ class TestAddMemory:
 
     def test_generate_fact_retrieval_response_called(self, mock_memory, base_memory_scenario):
         """Test that _generate_fact_retrieval_response is called with expected arguments"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_memory_updates = (
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_add_results = (
             base_memory_scenario
         )
 
@@ -474,7 +474,7 @@ class TestAddMemory:
 
     def test_generate_memory_actions_response_called(self, mock_memory, base_memory_scenario):
         """Test that _generate_memory_actions_response is called with expected arguments"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_memory_updates = (
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_add_results = (
             base_memory_scenario
         )
 
@@ -559,7 +559,7 @@ class TestAsyncAddMemory:
         self, mock_async_memory, caplog, mocker, base_memory_scenario
     ):
         """Test valid response in AsyncMemory.add"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_memory_updates = (
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_add_results = (
             base_memory_scenario
         )
 
@@ -588,7 +588,7 @@ class TestAsyncAddMemory:
                 infer=True,
             )
 
-        assert_add_result(add_result, expected_memory_updates)
+        assert_add_result(add_result, expected_add_results)
 
         assert mock_async_memory._generate_fact_retrieval_response.call_count == 1
         assert mock_async_memory._generate_memory_actions_response.call_count == 1
