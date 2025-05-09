@@ -169,36 +169,34 @@ def base_memory_scenario():
     #   * The memory actions are then performed on the vector store
     #       using the original UUIDs, new facts are given a new UUID
     #       and the relevant existing memories are updated or deleted
-    llm_responses = [
-        '{"facts": ["I like rice and beans and cheese", "Likes tacos"]}',
-        json.dumps(
-            {
-                "memory": [
-                    {
-                        "id": "0",
-                        "text": "I like rice and beans and cheese",
-                        "event": "UPDATE",
-                        "old_memory": "I like rice and beans",
-                    },
-                    {"id": "1", "text": "Likes rice", "event": "NONE"},
-                    {"id": "2", "text": "I like basmati rice", "event": "NONE"},
-                    {
-                        "id": "3",
-                        "text": "I like acro yoga, surfing, swimming, and paddle boarding.",
-                        "event": "NONE",
-                    },
-                    {"id": "4", "text": "Likes pizza", "event": "DELETE"},
-                    {"id": "5", "text": "Likes tacos", "event": "ADD"},
-                    {"id": "6", "text": "Likes Tuesdays", "event": "ADD"},
-                    {"id": "7", "text": "Likes T-Shirts", "event": "ADD"},
-                    {"id": "8", "text": "Likes Potatoes", "event": "ADD"},
-                    {"id": "9", "text": "Likes Pineapple", "event": "ADD"},
-                ]
-            }
-        ),
-    ]
+    fact_extraction_response = '{"facts": ["I like rice and beans and cheese", "Likes tacos"]}'
+    memory_actions_response = json.dumps(
+        {
+            "memory": [
+                {
+                    "id": "0",
+                    "text": "I like rice and beans and cheese",
+                    "event": "UPDATE",
+                    "old_memory": "I like rice and beans",
+                },
+                {"id": "1", "text": "Likes rice", "event": "NONE"},
+                {"id": "2", "text": "I like basmati rice", "event": "NONE"},
+                {
+                    "id": "3",
+                    "text": "I like acro yoga, surfing, swimming, and paddle boarding.",
+                    "event": "NONE",
+                },
+                {"id": "4", "text": "Likes pizza", "event": "DELETE"},
+                {"id": "5", "text": "Likes tacos", "event": "ADD"},
+                {"id": "6", "text": "Likes Tuesdays", "event": "ADD"},
+                {"id": "7", "text": "Likes T-Shirts", "event": "ADD"},
+                {"id": "8", "text": "Likes Potatoes", "event": "ADD"},
+                {"id": "9", "text": "Likes Pineapple", "event": "ADD"},
+            ]
+        }
+    )
 
-    return relevant_existing_memories, llm_responses, id_mapping, message_from_user
+    return relevant_existing_memories, fact_extraction_response, memory_actions_response, id_mapping, message_from_user
 
 
 class TestAddMemory:
@@ -221,7 +219,7 @@ class TestAddMemory:
 
     def test_valid_llm_response_fact_extraction(self, mock_memory, caplog, base_memory_scenario):
         """Test valid response from LLM during fact extraction"""
-        memory_payload, llm_responses, id_mapping, message_from_user = base_memory_scenario
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = base_memory_scenario
 
         from functools import partial
 
@@ -235,8 +233,8 @@ class TestAddMemory:
         mock_memory.vector_store.search.return_value = [mock_search(key) for key in memory_payload.keys()]
         mock_memory.vector_store.update.side_effect = mock_update
 
-        mock_memory._generate_fact_retrieval_response.return_value = llm_responses[0]
-        mock_memory._generate_memory_actions_response.return_value = llm_responses[1]
+        mock_memory._generate_fact_retrieval_response.return_value = fact_extraction_response
+        mock_memory._generate_memory_actions_response.return_value = memory_actions_response
 
         with caplog.at_level(logging.ERROR):
             add_result = mock_memory.add(
@@ -350,7 +348,7 @@ class TestAddMemory:
         Sometimes the LLM doesn't return a valid JSON response
         and we need to handle that gracefully.
         """
-        memory_payload, _, id_mapping, message_from_user = base_memory_scenario
+        memory_payload, _, _, id_mapping, message_from_user = base_memory_scenario
 
         from functools import partial
 
@@ -408,7 +406,7 @@ class TestAsyncAddMemory:
         self, mock_async_memory, caplog, mocker, base_memory_scenario
     ):
         """Test valid response in AsyncMemory.add"""
-        memory_payload, llm_responses, id_mapping, message_from_user = base_memory_scenario
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = base_memory_scenario
 
         from functools import partial
 
@@ -422,8 +420,8 @@ class TestAsyncAddMemory:
         mock_async_memory.vector_store.search.return_value = [mock_search(key) for key in memory_payload.keys()]
         mock_async_memory.vector_store.update.side_effect = mock_update
 
-        mock_async_memory._generate_fact_retrieval_response.return_value = llm_responses[0]
-        mock_async_memory._generate_memory_actions_response.return_value = llm_responses[1]
+        mock_async_memory._generate_fact_retrieval_response.return_value = fact_extraction_response
+        mock_async_memory._generate_memory_actions_response.return_value = memory_actions_response
 
         with caplog.at_level(logging.ERROR):
             add_result = await mock_async_memory.add(
@@ -541,7 +539,7 @@ class TestAsyncAddMemory:
         Sometimes the LLM doesn't return a valid JSON response
         and we need to handle that gracefully.
         """
-        memory_payload, _, id_mapping, message_from_user = base_memory_scenario
+        memory_payload, _, _, id_mapping, message_from_user = base_memory_scenario
 
         from functools import partial
 
