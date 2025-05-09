@@ -282,6 +282,26 @@ class TestMemoryLLMCalls:
             messages=[{"role": "user", "content": function_calling_prompt}], response_format={"type": "json_object"}
         )
 
+def assert_add_result(add_result, expected_results):
+    """Helper to assert the add result against expected results"""
+    assert add_result is not None
+    assert "results" in add_result
+    results = add_result["results"]
+    unordered_results = []
+    for result in results:
+        testing_result = {"memory": result["memory"], "event": result["event"]}
+        if result["event"] == "UPDATE":
+            testing_result["previous_memory"] = result["previous_memory"]
+            testing_result["id"] = result["id"]
+        if result["event"] == "DELETE":
+            testing_result["id"] = result["id"]
+        unordered_results.append(testing_result)
+
+    assert len(unordered_results) == len(expected_results)
+    assert sorted(unordered_results, key=lambda x: x["event"] + x["memory"]) == sorted(
+        expected_results, key=lambda x: x["event"] + x["memory"]
+    )
+
 
 class TestAddMemory:
     @pytest.fixture
@@ -300,6 +320,7 @@ class TestAddMemory:
         memory._generate_memory_actions_response = mocker.MagicMock()
 
         return memory
+    
 
     def test_valid_llm_response_fact_extraction(self, mock_memory, caplog, base_memory_scenario):
         """Test valid response from LLM during fact extraction"""
@@ -331,22 +352,6 @@ class TestAddMemory:
                 filters={},
                 infer=True,
             )
-        assert mock_memory._generate_fact_retrieval_response.call_count == 1
-        assert mock_memory._generate_memory_actions_response.call_count == 1
-        assert add_result is not None
-        assert "results" in add_result
-        results = add_result["results"]
-        unordered_results = []
-        for result in results:
-            testing_result = {"memory": result["memory"], "event": result["event"]}
-            if result["event"] == "UPDATE":
-                testing_result["previous_memory"] = result["previous_memory"]
-                testing_result["id"] = result["id"]
-            if result["event"] == "DELETE":
-                testing_result["id"] = result["id"]
-            unordered_results.append(testing_result)
-
-        assert len(unordered_results) == 7
         expected_unordered_results = [
             {
                 "id": "5e6c2501-095c-49b4-8e59-348cf6745f1d",
@@ -361,9 +366,10 @@ class TestAddMemory:
             {"memory": "Likes Pineapple", "event": "ADD"},
             {"memory": "Likes T-Shirts", "event": "ADD"},
         ]
-        assert sorted(unordered_results, key=lambda x: x["event"] + x["memory"]) == sorted(
-            expected_unordered_results, key=lambda x: x["event"] + x["memory"]
-        )
+        assert_add_result(add_result, expected_unordered_results)
+        
+        assert mock_memory._generate_fact_retrieval_response.call_count == 1
+        assert mock_memory._generate_memory_actions_response.call_count == 1
         # Check update calls unordered
         expected_update_call_values = [
             {
