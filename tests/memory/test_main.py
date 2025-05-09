@@ -199,11 +199,13 @@ def base_memory_scenario():
     return relevant_existing_memories, fact_extraction_response, memory_actions_response, id_mapping, message_from_user
 
 
-class TestAddMemory:
+class TestMemoryLLMCalls:
+    """Tests that verify direct LLM calls without mocking response methods"""
+
     @pytest.fixture
-    def mock_memory(self, mocker):
-        """Fixture that returns a Memory instance with mocker-based mocks"""
-        _, mock_vector_store = _setup_mocks(mocker)
+    def memory_for_llm_tests(self, mocker):
+        """Fixture that returns a Memory instance with minimal mocks"""
+        mock_llm, mock_vector_store = _setup_mocks(mocker)
 
         memory = Memory()
         memory.config = mocker.MagicMock()
@@ -211,7 +213,89 @@ class TestAddMemory:
         memory.config.custom_update_memory_prompt = None
         memory.api_version = "v1.1"
 
-        # Mock the new response generation methods
+        return memory
+
+    @pytest.fixture
+    def async_memory_for_llm_tests(self, mocker):
+        """Fixture that returns an AsyncMemory instance with minimal mocks"""
+        mock_llm, mock_vector_store = _setup_mocks(mocker)
+
+        memory = AsyncMemory()
+        memory.config = mocker.MagicMock()
+        memory.config.custom_fact_extraction_prompt = None
+        memory.config.custom_update_memory_prompt = None
+        memory.api_version = "v1.1"
+
+        return memory
+
+    def test_generate_fact_retrieval_response_calls_llm(self, memory_for_llm_tests):
+        """Test that _generate_fact_retrieval_response calls llm.generate_response"""
+        system_prompt = "Test system prompt"
+        user_prompt = "Test user prompt"
+
+        # Call the method
+        memory_for_llm_tests._generate_fact_retrieval_response(system_prompt, user_prompt)
+
+        # Verify llm.generate_response was called correctly
+        memory_for_llm_tests.llm.generate_response.assert_called_once_with(
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            response_format={"type": "json_object"},
+        )
+
+    def test_generate_memory_actions_response_calls_llm(self, memory_for_llm_tests):
+        """Test that _generate_memory_actions_response calls llm.generate_response"""
+        function_calling_prompt = "Test function calling prompt"
+
+        # Call the method
+        memory_for_llm_tests._generate_memory_actions_response(function_calling_prompt)
+
+        # Verify llm.generate_response was called correctly
+        memory_for_llm_tests.llm.generate_response.assert_called_once_with(
+            messages=[{"role": "user", "content": function_calling_prompt}], response_format={"type": "json_object"}
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_generate_fact_retrieval_response_calls_llm(self, async_memory_for_llm_tests):
+        """Test that _generate_fact_retrieval_response calls llm.generate_response in async mode"""
+        system_prompt = "Test system prompt"
+        user_prompt = "Test user prompt"
+
+        # Call the method
+        await async_memory_for_llm_tests._generate_fact_retrieval_response(system_prompt, user_prompt)
+
+        # Verify llm.generate_response was called correctly
+        async_memory_for_llm_tests.llm.generate_response.assert_called_once_with(
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            response_format={"type": "json_object"},
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_generate_memory_actions_response_calls_llm(self, async_memory_for_llm_tests):
+        """Test that _generate_memory_actions_response calls llm.generate_response in async mode"""
+        function_calling_prompt = "Test function calling prompt"
+
+        # Call the method
+        await async_memory_for_llm_tests._generate_memory_actions_response(function_calling_prompt)
+
+        # Verify llm.generate_response was called correctly
+        async_memory_for_llm_tests.llm.generate_response.assert_called_once_with(
+            messages=[{"role": "user", "content": function_calling_prompt}], response_format={"type": "json_object"}
+        )
+
+
+class TestAddMemory:
+    @pytest.fixture
+    def mock_memory(self, mocker):
+        """Fixture that returns a Memory instance with mocker-based mocks"""
+        mock_llm, mock_vector_store = _setup_mocks(mocker)
+
+        memory = Memory()
+        memory.config = mocker.MagicMock()
+        memory.config.custom_fact_extraction_prompt = None
+        memory.config.custom_update_memory_prompt = None
+        memory.api_version = "v1.1"
+
+        # Mock response generation methods but make them flexible
         memory._generate_fact_retrieval_response = mocker.MagicMock()
         memory._generate_memory_actions_response = mocker.MagicMock()
 
