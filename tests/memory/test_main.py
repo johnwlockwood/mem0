@@ -218,15 +218,42 @@ def base_memory_scenario():
             "hash": hashlib.md5("I like rice and beans and cheese".encode()).hexdigest(),
         }
     ]
+    expected_delete_call_values = [
+        "be6c8333-2e75-4177-a9b6-6a2a5d75dd32",
+    ]
+    expected_insert_call_values = [
+        {
+            "data": "Likes tacos",
+            "hash": hashlib.md5("Likes tacos".encode()).hexdigest(),
+        },
+        {
+            "data": "Likes Pineapple",
+            "hash": hashlib.md5("Likes Pineapple".encode()).hexdigest(),
+        },
+        {
+            "data": "Likes Potatoes",
+            "hash": hashlib.md5("Likes Potatoes".encode()).hexdigest(),
+        },
+        {
+            "data": "Likes T-Shirts",
+            "hash": hashlib.md5("Likes T-Shirts".encode()).hexdigest(),
+        },
+        {
+            "data": "Likes Tuesdays",
+            "hash": hashlib.md5("Likes Tuesdays".encode()).hexdigest(),
+        },
+    ]
 
     return (
-        relevant_existing_memories, 
-        fact_extraction_response, 
-        memory_actions_response, 
-        id_mapping, 
+        relevant_existing_memories,
+        fact_extraction_response,
+        memory_actions_response,
+        id_mapping,
         message_from_user,
         expected_add_results,
-        expected_update_call_values
+        expected_update_call_values,
+        expected_delete_call_values,
+        expected_insert_call_values,
     )
 
 
@@ -313,6 +340,7 @@ class TestMemoryLLMCalls:
             messages=[{"role": "user", "content": function_calling_prompt}], response_format={"type": "json_object"}
         )
 
+
 def assert_add_result(add_result, expected_add_results):
     """Helper to assert the add result against expected add results"""
     assert add_result is not None
@@ -352,6 +380,32 @@ def assert_expected_updates(mock_memory, expected_update_call_values):
     )
 
 
+def assert_expected_deletes(mock_memory, expected_delete_call_values):
+    """Helper to assert the delete calls against expected values"""
+    # Check delete calls unordered
+    actual_delete_calls = [call[1] for call in mock_memory.vector_store.delete.call_args_list]
+    actual_delete_call_values = [call_params["vector_id"] for call_params in actual_delete_calls]
+    assert len(actual_delete_calls) == len(expected_delete_call_values)
+    assert sorted(actual_delete_call_values) == sorted(expected_delete_call_values)
+
+
+def assert_expected_inserts(mock_memory, expected_insert_call_values):
+    """Helper to assert the insert calls against expected values"""
+    # Check insert calls unordered
+    actual_insert_calls = [call[1] for call in mock_memory.vector_store.insert.call_args_list]
+    actual_insert_call_values = [
+        {
+            "data": call_params["payloads"][0]["data"],
+            "hash": call_params["payloads"][0]["hash"],
+        }
+        for call_params in actual_insert_calls
+    ]
+    assert len(actual_insert_calls) == len(expected_insert_call_values)
+    assert sorted(actual_insert_call_values, key=lambda x: x["hash"]) == sorted(
+        expected_insert_call_values, key=lambda x: x["hash"]
+    )
+
+
 class TestAddMemory:
     @pytest.fixture
     def mock_memory(self, mocker):
@@ -369,13 +423,20 @@ class TestAddMemory:
         memory._generate_memory_actions_response = mocker.MagicMock()
 
         return memory
-    
 
-    def test_valid_llm_response_fact_extraction(self, mock_memory, caplog, base_memory_scenario):
+    def test_valid_llm_responses_memory_add_updates(self, mock_memory, caplog, base_memory_scenario):
         """Test valid response from LLM during fact extraction"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_add_results, expected_update_call_values = (
-            base_memory_scenario
-        )
+        (
+            memory_payload,
+            fact_extraction_response,
+            memory_actions_response,
+            id_mapping,
+            message_from_user,
+            expected_add_results,
+            expected_update_call_values,
+            expected_delete_call_values,
+            expected_insert_call_values,
+        ) = base_memory_scenario
 
         from functools import partial
 
@@ -402,63 +463,30 @@ class TestAddMemory:
                 infer=True,
             )
         assert_add_result(add_result, expected_add_results)
-        
+
         assert mock_memory._generate_fact_retrieval_response.call_count == 1
         assert mock_memory._generate_memory_actions_response.call_count == 1
         assert_expected_updates(mock_memory, expected_update_call_values)
 
         # Check delete calls unordered
-        expected_delete_call_values = ["be6c8333-2e75-4177-a9b6-6a2a5d75dd32"]
-        actual_delete_calls = [call[1] for call in mock_memory.vector_store.delete.call_args_list]
-        actual_delete_call_values = [call_params["vector_id"] for call_params in actual_delete_calls]
-        assert len(actual_delete_calls) == len(expected_delete_call_values)
-        assert sorted(actual_delete_call_values) == sorted(expected_delete_call_values)
+        assert_expected_deletes(mock_memory, expected_delete_call_values)
 
         # Check insert calls unordered
-        expected_insert_call_values = [
-            {
-                "data": "Likes tacos",
-                "hash": hashlib.md5("Likes tacos".encode()).hexdigest(),
-            },
-            {
-                "data": "Likes Pineapple",
-                "hash": hashlib.md5("Likes Pineapple".encode()).hexdigest(),
-            },
-            {
-                "data": "Likes Potatoes",
-                "hash": hashlib.md5("Likes Potatoes".encode()).hexdigest(),
-            },
-            {
-                "data": "Likes T-Shirts",
-                "hash": hashlib.md5("Likes T-Shirts".encode()).hexdigest(),
-            },
-            {
-                "data": "Likes Tuesdays",
-                "hash": hashlib.md5("Likes Tuesdays".encode()).hexdigest(),
-            },
-        ]
-
-        # Convert the call_args_list to a list of dictionaries
-        # containing the "data" and "hash" values
-        # from the payloads in the insert calls
-        # This is done to compare the actual calls with the expected calls
-        # in an order-independent manner
-        actual_calls = [call[1] for call in mock_memory.vector_store.insert.call_args_list]
-        actual_insert_call_values = [
-            {"data": call_params["payloads"][0]["data"], "hash": call_params["payloads"][0]["hash"]}
-            for call_params in actual_calls
-        ]
-        # Check that all expected calls are present (order-independent)
-        assert len(actual_calls) == len(expected_insert_call_values)
-        assert sorted(actual_insert_call_values, key=lambda x: x["hash"]) == sorted(
-            expected_insert_call_values, key=lambda x: x["hash"]
-        )
+        assert_expected_inserts(mock_memory, expected_insert_call_values)
 
     def test_generate_fact_retrieval_response_called(self, mock_memory, base_memory_scenario):
         """Test that _generate_fact_retrieval_response is called with expected arguments"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_add_results, expected_update_call_values = (
-            base_memory_scenario
-        )
+        (
+            memory_payload,
+            fact_extraction_response,
+            memory_actions_response,
+            id_mapping,
+            message_from_user,
+            expected_add_results,
+            expected_update_call_values,
+            expected_delete_call_values,
+            expected_insert_call_values,
+        ) = base_memory_scenario
 
         mock_memory._generate_fact_retrieval_response.return_value = fact_extraction_response
         mock_memory._generate_memory_actions_response.return_value = memory_actions_response
@@ -481,9 +509,17 @@ class TestAddMemory:
 
     def test_generate_memory_actions_response_called(self, mock_memory, base_memory_scenario):
         """Test that _generate_memory_actions_response is called with expected arguments"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_add_results, expected_update_call_values = (
-            base_memory_scenario
-        )
+        (
+            memory_payload,
+            fact_extraction_response,
+            memory_actions_response,
+            id_mapping,
+            message_from_user,
+            expected_add_results,
+            expected_update_call_values,
+            expected_delete_call_values,
+            expected_insert_call_values,
+        ) = base_memory_scenario
 
         mock_memory._generate_fact_retrieval_response.return_value = fact_extraction_response
         mock_memory._generate_memory_actions_response.return_value = memory_actions_response
@@ -508,7 +544,17 @@ class TestAddMemory:
         Sometimes the LLM doesn't return a valid JSON response
         and we need to handle that gracefully.
         """
-        memory_payload, _, _, id_mapping, message_from_user, _, _ = base_memory_scenario
+        (
+            memory_payload,
+            fact_extraction_response,
+            memory_actions_response,
+            id_mapping,
+            message_from_user,
+            expected_add_results,
+            expected_update_call_values,
+            expected_delete_call_values,
+            expected_insert_call_values,
+        ) = base_memory_scenario
 
         from functools import partial
 
@@ -562,13 +608,21 @@ class TestAsyncAddMemory:
         return memory
 
     @pytest.mark.asyncio
-    async def test_async_valid_llm_response_fact_extraction(
+    async def test_valid_llm_responses_memory_add_updates(
         self, mock_async_memory, caplog, mocker, base_memory_scenario
     ):
         """Test valid response in AsyncMemory.add"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user, expected_add_results, expected_update_call_values = (
-            base_memory_scenario
-        )
+        (
+            memory_payload,
+            fact_extraction_response,
+            memory_actions_response,
+            id_mapping,
+            message_from_user,
+            expected_add_results,
+            expected_update_call_values,
+            expected_delete_call_values,
+            expected_insert_call_values,
+        ) = base_memory_scenario
 
         from functools import partial
 
@@ -601,59 +655,28 @@ class TestAsyncAddMemory:
         assert mock_async_memory._generate_memory_actions_response.call_count == 1
         assert_expected_updates(mock_async_memory, expected_update_call_values)
 
+        assert_expected_updates(mock_async_memory, expected_update_call_values)
+
         # Check delete calls unordered
-        expected_delete_call_values = ["be6c8333-2e75-4177-a9b6-6a2a5d75dd32"]
-        actual_delete_calls = [call[1] for call in mock_async_memory.vector_store.delete.call_args_list]
-        actual_delete_call_values = [call_params["vector_id"] for call_params in actual_delete_calls]
-        assert len(actual_delete_calls) == len(expected_delete_call_values)
-        assert sorted(actual_delete_call_values) == sorted(expected_delete_call_values)
+        assert_expected_deletes(mock_async_memory, expected_delete_call_values)
 
         # Check insert calls unordered
-        expected_insert_call_values = [
-            {
-                "data": "Likes tacos",
-                "hash": hashlib.md5("Likes tacos".encode()).hexdigest(),
-            },
-            {
-                "data": "Likes Pineapple",
-                "hash": hashlib.md5("Likes Pineapple".encode()).hexdigest(),
-            },
-            {
-                "data": "Likes Potatoes",
-                "hash": hashlib.md5("Likes Potatoes".encode()).hexdigest(),
-            },
-            {
-                "data": "Likes T-Shirts",
-                "hash": hashlib.md5("Likes T-Shirts".encode()).hexdigest(),
-            },
-            {
-                "data": "Likes Tuesdays",
-                "hash": hashlib.md5("Likes Tuesdays".encode()).hexdigest(),
-            },
-        ]
-
-        # Convert the call_args_list to a list of dictionaries
-        # containing the "data" and "hash" values
-        # from the payloads in the insert calls
-        # This is done to compare the actual calls with the expected calls
-        # in an order-independent manner
-        actual_calls = [call[1] for call in mock_async_memory.vector_store.insert.call_args_list]
-        actual_insert_call_values = [
-            {"data": call_params["payloads"][0]["data"], "hash": call_params["payloads"][0]["hash"]}
-            for call_params in actual_calls
-        ]
-        # Check that all expected calls are present (order-independent)
-        assert len(actual_calls) == len(expected_insert_call_values)
-        assert sorted(actual_insert_call_values, key=lambda x: x["hash"]) == sorted(
-            expected_insert_call_values, key=lambda x: x["hash"]
-        )
+        assert_expected_inserts(mock_async_memory, expected_insert_call_values)
 
     @pytest.mark.asyncio
     async def test_async_generate_fact_retrieval_response_called(self, mock_async_memory, base_memory_scenario):
         """Test that _generate_fact_retrieval_response is called with expected arguments in async mode"""
-        memory_payload, fact_extraction_response, memory_actions_response, _, message_from_user, _, _ = (
-            base_memory_scenario
-        )
+        (
+            memory_payload,
+            fact_extraction_response,
+            memory_actions_response,
+            id_mapping,
+            message_from_user,
+            expected_add_results,
+            expected_update_call_values,
+            expected_delete_call_values,
+            expected_insert_call_values,
+        ) = base_memory_scenario
 
         mock_async_memory._generate_fact_retrieval_response.return_value = fact_extraction_response
         mock_async_memory._generate_memory_actions_response.return_value = memory_actions_response
@@ -677,9 +700,17 @@ class TestAsyncAddMemory:
     @pytest.mark.asyncio
     async def test_async_generate_memory_actions_response_called(self, mock_async_memory, base_memory_scenario):
         """Test that _generate_memory_actions_response is called with expected arguments in async mode"""
-        memory_payload, fact_extraction_response, memory_actions_response, _, message_from_user, _, _ = (
-            base_memory_scenario
-        )
+        (
+            memory_payload,
+            fact_extraction_response,
+            memory_actions_response,
+            id_mapping,
+            message_from_user,
+            expected_add_results,
+            expected_update_call_values,
+            expected_delete_call_values,
+            expected_insert_call_values,
+        ) = base_memory_scenario
 
         mock_async_memory._generate_fact_retrieval_response.return_value = fact_extraction_response
         mock_async_memory._generate_memory_actions_response.return_value = memory_actions_response
@@ -707,8 +738,17 @@ class TestAsyncAddMemory:
         Sometimes the LLM doesn't return a valid JSON response
         and we need to handle that gracefully.
         """
-        memory_payload, _, _, id_mapping, message_from_user, _, _ = base_memory_scenario
-
+        (
+            memory_payload,
+            fact_extraction_response,
+            memory_actions_response,
+            id_mapping,
+            message_from_user,
+            expected_add_results,
+            expected_update_call_values,
+            expected_delete_call_values,
+            expected_insert_call_values,
+        ) = base_memory_scenario
         from functools import partial
 
         mock_get = partial(create_mock_record, memory_payload)
