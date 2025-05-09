@@ -210,7 +210,7 @@ class TestAddMemory:
         memory.config.custom_fact_extraction_prompt = None
         memory.config.custom_update_memory_prompt = None
         memory.api_version = "v1.1"
-        
+
         # Mock the new response generation methods
         memory._generate_fact_retrieval_response = mocker.MagicMock()
         memory._generate_memory_actions_response = mocker.MagicMock()
@@ -219,7 +219,9 @@ class TestAddMemory:
 
     def test_valid_llm_response_fact_extraction(self, mock_memory, caplog, base_memory_scenario):
         """Test valid response from LLM during fact extraction"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = base_memory_scenario
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = (
+            base_memory_scenario
+        )
 
         from functools import partial
 
@@ -288,7 +290,11 @@ class TestAddMemory:
         ]
         actual_update_calls = [call[1] for call in mock_memory.vector_store.update.call_args_list]
         actual_update_call_values = [
-            {"vector_id": call_params["vector_id"], "data": call_params["payload"]["data"], "hash": call_params["payload"]["hash"]}
+            {
+                "vector_id": call_params["vector_id"],
+                "data": call_params["payload"]["data"],
+                "hash": call_params["payload"]["hash"],
+            }
             for call_params in actual_update_calls
         ]
         assert len(actual_update_calls) == len(expected_update_call_values)
@@ -342,6 +348,55 @@ class TestAddMemory:
         assert sorted(actual_insert_call_values, key=lambda x: x["hash"]) == sorted(
             expected_insert_call_values, key=lambda x: x["hash"]
         )
+
+    def test_generate_fact_retrieval_response_called(self, mock_memory, base_memory_scenario):
+        """Test that _generate_fact_retrieval_response is called with expected arguments"""
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = (
+            base_memory_scenario
+        )
+
+        mock_memory._generate_fact_retrieval_response.return_value = fact_extraction_response
+        mock_memory._generate_memory_actions_response.return_value = memory_actions_response
+
+        mock_memory.add(
+            messages=[{"role": "user", "content": message_from_user}],
+            user_id="default_user",
+            agent_id="test_agent",
+            metadata={},
+            filters={},
+            infer=True,
+        )
+
+        # Verify method was called once with expected arguments
+        mock_memory._generate_fact_retrieval_response.assert_called_once()
+        args, _ = mock_memory._generate_fact_retrieval_response.call_args
+        assert isinstance(args[0], str)  # system_prompt
+        assert isinstance(args[1], str)  # user_prompt
+        assert "Input:" in args[1]  # Verify user prompt contains input
+
+    def test_generate_memory_actions_response_called(self, mock_memory, base_memory_scenario):
+        """Test that _generate_memory_actions_response is called with expected arguments"""
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = (
+            base_memory_scenario
+        )
+
+        mock_memory._generate_fact_retrieval_response.return_value = fact_extraction_response
+        mock_memory._generate_memory_actions_response.return_value = memory_actions_response
+
+        mock_memory.add(
+            messages=[{"role": "user", "content": message_from_user}],
+            user_id="default_user",
+            agent_id="test_agent",
+            metadata={},
+            filters={},
+            infer=True,
+        )
+
+        # Verify method was called once with expected arguments
+        mock_memory._generate_memory_actions_response.assert_called_once()
+        args, _ = mock_memory._generate_memory_actions_response.call_args
+        assert isinstance(args[0], str)  # function_calling_prompt
+        assert "memory" in args[0]  # Verify prompt contains memory context
 
     def test_empty_llm_response_memory_actions(self, mock_memory, caplog, base_memory_scenario):
         """Test empty response in AsyncMemory.add.
@@ -406,7 +461,9 @@ class TestAsyncAddMemory:
         self, mock_async_memory, caplog, mocker, base_memory_scenario
     ):
         """Test valid response in AsyncMemory.add"""
-        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = base_memory_scenario
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = (
+            base_memory_scenario
+        )
 
         from functools import partial
 
@@ -476,7 +533,11 @@ class TestAsyncAddMemory:
         ]
         actual_update_calls = [call[1] for call in mock_async_memory.vector_store.update.call_args_list]
         actual_update_call_values = [
-            {"vector_id": call_params["vector_id"], "data": call_params["payload"]["data"], "hash": call_params["payload"]["hash"]}
+            {
+                "vector_id": call_params["vector_id"],
+                "data": call_params["payload"]["data"],
+                "hash": call_params["payload"]["hash"],
+            }
             for call_params in actual_update_calls
         ]
         assert len(actual_update_calls) == len(expected_update_call_values)
@@ -530,6 +591,57 @@ class TestAsyncAddMemory:
         assert sorted(actual_insert_call_values, key=lambda x: x["hash"]) == sorted(
             expected_insert_call_values, key=lambda x: x["hash"]
         )
+
+    @pytest.mark.asyncio
+    async def test_async_generate_fact_retrieval_response_called(self, mock_async_memory, base_memory_scenario):
+        """Test that _generate_fact_retrieval_response is called with expected arguments in async mode"""
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = (
+            base_memory_scenario
+        )
+
+        mock_async_memory._generate_fact_retrieval_response.return_value = fact_extraction_response
+        mock_async_memory._generate_memory_actions_response.return_value = memory_actions_response
+
+        await mock_async_memory.add(
+            messages=[{"role": "user", "content": message_from_user}],
+            user_id="default_user",
+            agent_id="test_agent",
+            metadata={},
+            filters={},
+            infer=True,
+        )
+
+        # Verify method was called once with expected arguments
+        mock_async_memory._generate_fact_retrieval_response.assert_called_once()
+        args, _ = mock_async_memory._generate_fact_retrieval_response.call_args
+        assert isinstance(args[0], str)  # system_prompt
+        assert isinstance(args[1], str)  # user_prompt
+        assert "Input:" in args[1]  # Verify user prompt contains input
+
+    @pytest.mark.asyncio
+    async def test_async_generate_memory_actions_response_called(self, mock_async_memory, base_memory_scenario):
+        """Test that _generate_memory_actions_response is called with expected arguments in async mode"""
+        memory_payload, fact_extraction_response, memory_actions_response, id_mapping, message_from_user = (
+            base_memory_scenario
+        )
+
+        mock_async_memory._generate_fact_retrieval_response.return_value = fact_extraction_response
+        mock_async_memory._generate_memory_actions_response.return_value = memory_actions_response
+
+        await mock_async_memory.add(
+            messages=[{"role": "user", "content": message_from_user}],
+            user_id="default_user",
+            agent_id="test_agent",
+            metadata={},
+            filters={},
+            infer=True,
+        )
+
+        # Verify method was called once with expected arguments
+        mock_async_memory._generate_memory_actions_response.assert_called_once()
+        args, _ = mock_async_memory._generate_memory_actions_response.call_args
+        assert isinstance(args[0], str)  # function_calling_prompt
+        assert "memory" in args[0]  # Verify prompt contains memory context
 
     @pytest.mark.asyncio
     async def test_async_empty_llm_response_memory_actions(
