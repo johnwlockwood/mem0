@@ -1,6 +1,11 @@
+import logging
 import re
+from copy import deepcopy
+from typing import Any, Dict, Optional, Tuple
 
 from mem0.configs.prompts import FACT_RETRIEVAL_PROMPT
+
+logger = logging.getLogger(__name__)
 
 
 def get_fact_retrieval_messages(message):
@@ -99,6 +104,38 @@ def unique_old_memory(retrieved_old_memory: list) -> list:
     for item in retrieved_old_memory:
         unique_data[item["id"]] = item
     return list(unique_data.values())
+
+
+def process_message_for_memory(message_dict: Dict[str, Any], metadata: Dict[str, Any]) -> Optional[Tuple[str, Dict[str, Any]]]:
+    """Processes a message dictionary for storage in memory.
+    
+    Args:
+        message_dict: The message dict to process (must have 'role' and 'content')
+        metadata: Base metadata dict to augment with message-specific fields
+        
+    Returns:
+        Tuple of (message_content, processed_metadata) if valid message, 
+        None if message should be skipped (invalid or system message)
+    """
+    if (
+        not isinstance(message_dict, dict)
+        or message_dict.get("role") is None
+        or message_dict.get("content") is None
+    ):
+        logger.warning(f"Skipping invalid message format: {message_dict}")
+        return None
+
+    if message_dict["role"] == "system":
+        return None
+
+    per_msg_meta = deepcopy(metadata)
+    per_msg_meta["role"] = message_dict["role"]
+
+    actor_name = message_dict.get("name")
+    if actor_name:
+        per_msg_meta["actor_id"] = actor_name
+
+    return message_dict["content"], per_msg_meta
 
 
 def parse_vision_messages(messages, llm=None, vision_details="auto"):

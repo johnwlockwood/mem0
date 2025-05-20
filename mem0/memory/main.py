@@ -29,6 +29,7 @@ from mem0.memory.utils import (
     get_fact_retrieval_messages,
     parse_messages,
     parse_vision_messages,
+    process_message_for_memory,
     remove_code_blocks,
     unique_old_memory,
 )
@@ -422,25 +423,11 @@ class Memory(MemoryBase):
         if not infer:
             returned_memories = []
             for message_dict in messages:
-                if (
-                    not isinstance(message_dict, dict)
-                    or message_dict.get("role") is None
-                    or message_dict.get("content") is None
-                ):
-                    logger.warning(f"Skipping invalid message format: {message_dict}")
+                processed = process_message_for_memory(message_dict, metadata)
+                if processed is None:
                     continue
-
-                if message_dict["role"] == "system":
-                    continue
-
-                per_msg_meta = deepcopy(metadata)
-                per_msg_meta["role"] = message_dict["role"]
-
-                actor_name = message_dict.get("name")
-                if actor_name:
-                    per_msg_meta["actor_id"] = actor_name
-
-                msg_content = message_dict["content"]
+                    
+                msg_content, per_msg_meta = processed
                 msg_embeddings = self.embedding_model.embed(msg_content, "add")
                 mem_id = self._create_memory(msg_content, msg_embeddings, per_msg_meta)
 
@@ -449,7 +436,7 @@ class Memory(MemoryBase):
                         "id": mem_id,
                         "memory": msg_content,
                         "event": "ADD",
-                        "actor_id": actor_name if actor_name else None,
+                        "actor_id": per_msg_meta.get("actor_id"),
                         "role": message_dict["role"],
                     }
                 )
@@ -1195,25 +1182,11 @@ class AsyncMemory(MemoryBase):
         if not infer:
             returned_memories = []
             for message_dict in messages:
-                if (
-                    not isinstance(message_dict, dict)
-                    or message_dict.get("role") is None
-                    or message_dict.get("content") is None
-                ):
-                    logger.warning(f"Skipping invalid message format (async): {message_dict}")
+                processed = process_message_for_memory(message_dict, metadata)
+                if processed is None:
                     continue
-
-                if message_dict["role"] == "system":
-                    continue
-
-                per_msg_meta = deepcopy(metadata)
-                per_msg_meta["role"] = message_dict["role"]
-
-                actor_name = message_dict.get("name")
-                if actor_name:
-                    per_msg_meta["actor_id"] = actor_name
-
-                msg_content = message_dict["content"]
+                    
+                msg_content, per_msg_meta = processed
                 msg_embeddings = await asyncio.to_thread(self.embedding_model.embed, msg_content, "add")
                 mem_id = await self._create_memory(msg_content, msg_embeddings, per_msg_meta)
 
@@ -1222,7 +1195,7 @@ class AsyncMemory(MemoryBase):
                         "id": mem_id,
                         "memory": msg_content,
                         "event": "ADD",
-                        "actor_id": actor_name if actor_name else None,
+                        "actor_id": per_msg_meta.get("actor_id"),
                         "role": message_dict["role"],
                     }
                 )
