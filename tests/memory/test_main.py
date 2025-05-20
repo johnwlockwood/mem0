@@ -459,7 +459,6 @@ class TestAddMemory:
                 user_id="default_user",
                 agent_id="test_agent",
                 metadata={},
-                filters={},
                 infer=True,
             )
         assert_add_result(add_result, expected_add_results)
@@ -496,7 +495,6 @@ class TestAddMemory:
             user_id="default_user",
             agent_id="test_agent",
             metadata={},
-            filters={},
             infer=True,
         )
 
@@ -529,7 +527,6 @@ class TestAddMemory:
             user_id="default_user",
             agent_id="test_agent",
             metadata={},
-            filters={},
             infer=True,
         )
 
@@ -572,7 +569,6 @@ class TestAddMemory:
                 user_id="default_user",
                 agent_id="test_agent",
                 metadata={},
-                filters={},
                 infer=True,
             )
 
@@ -645,7 +641,6 @@ class TestAsyncAddMemory:
                 user_id="default_user",
                 agent_id="test_agent",
                 metadata={},
-                filters={},
                 infer=True,
             )
 
@@ -686,7 +681,6 @@ class TestAsyncAddMemory:
             user_id="default_user",
             agent_id="test_agent",
             metadata={},
-            filters={},
             infer=True,
         )
 
@@ -720,7 +714,6 @@ class TestAsyncAddMemory:
             user_id="default_user",
             agent_id="test_agent",
             metadata={},
-            filters={},
             infer=True,
         )
 
@@ -766,7 +759,6 @@ class TestAsyncAddMemory:
                 user_id="default_user",
                 agent_id="test_agent",
                 metadata={},
-                filters={},
                 infer=True,
             )
         assert mock_async_memory._generate_fact_retrieval_response.call_count == 1
