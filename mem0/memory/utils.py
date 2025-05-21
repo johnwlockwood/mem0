@@ -121,6 +121,7 @@ def process_message_for_memory(message_dict: Dict[str, Any], metadata: Dict[str,
         not isinstance(message_dict, dict)
         or message_dict.get("role") is None
         or message_dict.get("content") is None
+        or not message_dict.get("content")
     ):
         logger.warning(f"Skipping invalid message format: {message_dict}")
         return None

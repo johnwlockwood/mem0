@@ -29,6 +29,30 @@ def _setup_mocks(mocker):
     return mock_llm, mock_vector_store
 
 
+def _setup_process_message_for_memory_mock(mocker):
+    """Creates and configures a mock for process_message_for_memory utility function.
+    
+    This helper function:
+    1. Creates a MagicMock for process_message_for_memory
+    2. Patches the function in the mem0.memory.utils module
+    3. Returns the mock for further configuration
+    
+    Returns:
+        MagicMock: Configured mock object that replaces process_message_for_memory,
+        allowing tests to:
+        - Set return values via .return_value
+        - Verify calls via assert_called_* methods
+        - Configure side effects via .side_effect
+        
+    Example:
+        mock_process = _setup_process_message_for_memory_mock(mocker)
+        mock_process.return_value = ("test", {"meta": "data"})
+    """
+    mock_process_message = mocker.MagicMock()
+    mocker.patch("mem0.memory.utils.process_message_for_memory", mock_process_message)
+    return mock_process_message
+
+
 def get_vector_payload(memory_payload, vector_id):
     """Helper to get payload from memory_payload dict"""
     return memory_payload.get(vector_id)
@@ -255,6 +279,61 @@ def base_memory_scenario():
         expected_delete_call_values,
         expected_insert_call_values,
     )
+
+
+class TestMemoryMessageProcessing:
+    """Tests for message processing functionality"""
+
+    @pytest.fixture
+    def mock_memory(self, mocker):
+        """Fixture that returns a Memory instance with minimal mocks"""
+        mock_llm, mock_vector_store = _setup_mocks(mocker)
+
+        memory = Memory()
+        memory.config = mocker.MagicMock()
+        memory.config.custom_fact_extraction_prompt = None
+        memory.config.custom_update_memory_prompt = None
+        memory.api_version = "v1.1"
+
+        return memory
+
+    @pytest.fixture
+    def mock_async_memory(self, mocker):
+        """Fixture that returns an AsyncMemory instance with minimal mocks"""
+        mock_llm, mock_vector_store = _setup_mocks(mocker)
+
+        memory = AsyncMemory()
+        memory.config = mocker.MagicMock()
+        memory.config.custom_fact_extraction_prompt = None
+        memory.config.custom_update_memory_prompt = None
+        memory.api_version = "v1.1"
+
+        return memory
+
+    def test_message_processing_in_sync_add(self, mock_memory, mocker):
+        """Test process_message_for_memory is called correctly in sync add"""
+        mock_process_message = _setup_process_message_for_memory_mock(mocker)
+        mock_process_message.return_value = ("test content", {"role": "user"})
+
+        mock_memory.add(messages=[{"role": "user", "content": "test"}], user_id="test_user", infer=False)
+
+        mock_process_message.assert_called_once()
+        args, _ = mock_process_message.call_args
+        assert args[0] == {"role": "user", "content": "test"}
+        assert "user_id" in args[1]
+
+    @pytest.mark.asyncio
+    async def test_message_processing_in_async_add(self, mock_async_memory, mocker):
+        """Test process_message_for_memory is called correctly in async add"""
+        mock_process_message = _setup_process_message_for_memory_mock(mocker)
+        mock_process_message.return_value = ("test content", {"role": "user"})
+
+        await mock_async_memory.add(messages=[{"role": "user", "content": "test"}], user_id="test_user", infer=False)
+
+        mock_process_message.assert_called_once()
+        args, _ = mock_process_message.call_args
+        assert args[0] == {"role": "user", "content": "test"}
+        assert "user_id" in args[1]
 
 
 class TestMemoryLLMCalls:

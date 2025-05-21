@@ -29,7 +29,6 @@ from mem0.memory.utils import (
     get_fact_retrieval_messages,
     parse_messages,
     parse_vision_messages,
-    process_message_for_memory,
     remove_code_blocks,
     unique_old_memory,
 )
@@ -421,6 +420,7 @@ class Memory(MemoryBase):
 
     def _add_to_vector_store(self, messages, metadata, filters, infer):
         if not infer:
+            from mem0.memory.utils import process_message_for_memory
             returned_memories = []
             for message_dict in messages:
                 processed = process_message_for_memory(message_dict, metadata)
@@ -1180,6 +1180,7 @@ class AsyncMemory(MemoryBase):
         infer: bool,
     ):
         if not infer:
+            from mem0.memory.utils import process_message_for_memory
             returned_memories = []
             for message_dict in messages:
                 processed = process_message_for_memory(message_dict, metadata)
