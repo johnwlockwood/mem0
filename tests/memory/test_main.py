@@ -659,7 +659,7 @@ class TestAddMemory:
         assert "results" in add_result
         results = add_result["results"]
         assert results == []
-        # assert "Invalid JSON response" in caplog.text
+        assert "Error in new_retrieved_facts" in caplog.text
         assert mock_memory.vector_store.update.call_count == 0
         assert mock_memory.vector_store.insert.call_count == 0
         assert mock_capture_event.call_count == 1
@@ -899,7 +899,7 @@ class TestAsyncAddMemory:
         assert "results" in add_result
         results = add_result["results"]
         assert results == []
-        # assert "Invalid JSON response" in caplog.text
+        assert "Error in new_retrieved_facts" in caplog.text
         assert mock_async_memory.vector_store.update.call_count == 0
         assert mock_async_memory.vector_store.insert.call_count == 0
         assert mock_capture_event.call_count == 1
