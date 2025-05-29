@@ -31,19 +31,19 @@ def _setup_mocks(mocker):
 
 def _setup_process_message_for_memory_mock(mocker):
     """Creates and configures a mock for process_message_for_memory utility function.
-    
+
     This helper function:
     1. Creates a MagicMock for process_message_for_memory
     2. Patches the function in the mem0.memory.utils module
     3. Returns the mock for further configuration
-    
+
     Returns:
         MagicMock: Configured mock object that replaces process_message_for_memory,
         allowing tests to:
         - Set return values via .return_value
         - Verify calls via assert_called_* methods
         - Configure side effects via .side_effect
-        
+
     Example:
         mock_process = _setup_process_message_for_memory_mock(mocker)
         mock_process.return_value = ("test", {"meta": "data"})
@@ -615,7 +615,6 @@ class TestAddMemory:
         assert isinstance(args[0], str)  # function_calling_prompt
         assert "memory" in args[0]  # Verify prompt contains memory context
 
-    
     def test_empty_llm_response_fact_extraction(self, mocker, mock_memory, caplog, base_memory_scenario):
         """Test empty response in AsyncMemory.add.
         Sometimes the LLM doesn't return a valid JSON response
@@ -886,7 +885,6 @@ class TestAsyncAddMemory:
         mock_capture_event = mocker.MagicMock()
         mocker.patch("mem0.memory.main.capture_event", mock_capture_event)
 
-
         with caplog.at_level(logging.ERROR):
             add_result = await mock_async_memory.add(
                 messages=[{"role": "user", "content": message_from_user}],
@@ -937,7 +935,6 @@ class TestAsyncAddMemory:
         mock_async_memory._generate_memory_actions_response.return_value = ""
         mock_capture_event = mocker.MagicMock()
         mocker.patch("mem0.memory.main.capture_event", mock_capture_event)
-
 
         with caplog.at_level(logging.ERROR):
             add_result = await mock_async_memory.add(

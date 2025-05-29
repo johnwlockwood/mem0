@@ -310,8 +310,7 @@ class Memory(MemoryBase):
         except Exception as e:
             logging.error(f"Error in new_retrieved_facts: {e}")
             new_retrieved_facts = []
-        
-        
+
         if not new_retrieved_facts:
             logger.debug("No new facts retrieved from input. Skipping memory update LLM call.")
 
@@ -425,12 +424,13 @@ class Memory(MemoryBase):
     def _add_to_vector_store(self, messages, metadata, filters, infer):
         if not infer:
             from mem0.memory.utils import process_message_for_memory
+
             returned_memories = []
             for message_dict in messages:
                 processed = process_message_for_memory(message_dict, metadata)
                 if processed is None:
                     continue
-                    
+
                 msg_content, per_msg_meta = processed
                 msg_embeddings = self.embedding_model.embed(msg_content, "add")
                 mem_id = self._create_memory(msg_content, msg_embeddings, per_msg_meta)
@@ -1147,7 +1147,7 @@ class AsyncMemory(MemoryBase):
         except Exception as e:
             logging.error(f"Error in new_retrieved_facts: {e}")
             new_retrieved_facts = []
-        
+
         if not new_retrieved_facts:
             logger.debug("No new facts retrieved from input. Skipping memory update LLM call.")
 
@@ -1190,12 +1190,13 @@ class AsyncMemory(MemoryBase):
     ):
         if not infer:
             from mem0.memory.utils import process_message_for_memory
+
             returned_memories = []
             for message_dict in messages:
                 processed = process_message_for_memory(message_dict, metadata)
                 if processed is None:
                     continue
-                    
+
                 msg_content, per_msg_meta = processed
                 msg_embeddings = await asyncio.to_thread(self.embedding_model.embed, msg_content, "add")
                 mem_id = await self._create_memory(msg_content, msg_embeddings, per_msg_meta)
