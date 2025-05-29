@@ -77,10 +77,10 @@ def get_image_description(image_obj, llm, vision_details):
 
 def create_uuid_mapping(retrieved_old_memory):
     """Create a temporary mapping between UUIDs and integer indices.
-    
+
     Args:
         retrieved_old_memory: List of memory items with UUIDs
-        
+
     Returns:
         tuple: (modified_memory_list, uuid_mapping_dict)
     """
@@ -93,10 +93,10 @@ def create_uuid_mapping(retrieved_old_memory):
 
 def unique_old_memory(retrieved_old_memory: list) -> list:
     """Processes the retrieved old memory to ensure unique entries.
-    
+
     Args:
         retrieved_old_memory: List of memory items with duplicate possible
-        
+
     Returns:
         List of unique memory items based on their IDs
     """

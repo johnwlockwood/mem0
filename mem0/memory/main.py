@@ -310,6 +310,9 @@ class Memory(MemoryBase):
         except Exception as e:
             logging.error(f"Error in new_retrieved_facts: {e}")
             new_retrieved_facts = []
+        
+        if not new_retrieved_facts:
+            logger.debug("No new facts retrieved from input. Skipping memory update LLM call.")
 
         retrieved_old_memory = []
         new_message_embeddings = {}
@@ -445,14 +448,16 @@ class Memory(MemoryBase):
         new_retrieved_facts, retrieved_old_memory, temp_uuid_mapping, new_message_embeddings = self._do_fact_retrieval(
             messages, filters
         )
+        if new_retrieved_facts:
+            new_memories_with_actions = self._get_memory_actions(
+                retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata
+            )
 
-        new_memories_with_actions = self._get_memory_actions(
-            retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata
-        )
-
-        returned_memories = self._process_memory_actions(
-            new_memories_with_actions, temp_uuid_mapping, new_message_embeddings, metadata
-        )
+            returned_memories = self._process_memory_actions(
+                new_memories_with_actions, temp_uuid_mapping, new_message_embeddings, metadata
+            )
+        else:
+            returned_memories = []
 
         capture_event(
             "mem0.add",
@@ -1141,6 +1146,9 @@ class AsyncMemory(MemoryBase):
         except Exception as e:
             logging.error(f"Error in new_retrieved_facts: {e}")
             new_retrieved_facts = []
+        
+        if not new_retrieved_facts:
+            logger.debug("No new facts retrieved from input. Skipping memory update LLM call.")
 
         retrieved_old_memory = []
         new_message_embeddings = {}
@@ -1208,14 +1216,16 @@ class AsyncMemory(MemoryBase):
             temp_uuid_mapping,
             new_message_embeddings,
         ) = await self._do_fact_retrieval(messages, filters)
+        if new_retrieved_facts:
+            new_memories_with_actions = await self._get_memory_actions(
+                retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata
+            )
 
-        new_memories_with_actions = await self._get_memory_actions(
-            retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata
-        )
-
-        returned_memories = await self._process_memory_actions(
-            new_memories_with_actions, temp_uuid_mapping, new_message_embeddings, metadata
-        )
+            returned_memories = await self._process_memory_actions(
+                new_memories_with_actions, temp_uuid_mapping, new_message_embeddings, metadata
+            )
+        else:
+            returned_memories = []
 
         capture_event(
             "mem0.add", self, {"version": self.api_version, "keys": list(filters.keys()), "sync_type": "async"}
