@@ -76,7 +76,7 @@ class TestAsyncMemoryClient:
         """
         # Given
         api_key = "test_key"
-        test_messages = "test message"
+        test_messages = [{"role": "user", "content": "test message"}]
         request = httpx.Request("POST", "https://api.mem0.ai/v1/memories/")
         mock_async_client.post.return_value = httpx.Response(200, json={"id": "mem123"}, request=request)
         mocker.patch.object(AsyncMemoryClient, "_validate_api_key", return_value="test@example.com")

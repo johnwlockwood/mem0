@@ -78,7 +78,7 @@ class TestMemoryClient:
         mock_client.post.return_value = httpx.Response(200, json={"id": "mem123"}, request=request)
 
         # When
-        result = client.add("test message")
+        result = client.add([{"role": "user", "content": "test message"}])
 
         # Then
         assert result == {"id": "mem123"}
