@@ -1433,7 +1433,7 @@ class AsyncMemory(MemoryBase):
         if self.enable_graph:
             all_memories_result, graph_entities_result = await asyncio.gather(
                 self._get_all_from_vector_store(effective_filters, limit),
-                asyncio.to_thread(self.graph.get_all, effective_filters, limit)
+                asyncio.to_thread(self.graph.get_all, effective_filters, limit),
             )
         else:
             all_memories_result = await self._get_all_from_vector_store(effective_filters, limit)
