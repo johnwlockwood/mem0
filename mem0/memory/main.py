@@ -315,7 +315,7 @@ class Memory(MemoryBase):
         except Exception as e:
             logging.error(f"Error in new_retrieved_facts: {e}")
             new_retrieved_facts = []
-        
+
         if not new_retrieved_facts:
             logger.debug("No new facts retrieved from input. Skipping memory update LLM call.")
 
@@ -429,12 +429,13 @@ class Memory(MemoryBase):
     def _add_to_vector_store(self, messages, metadata, filters, infer):
         if not infer:
             from mem0.memory.utils import process_message_for_memory
+
             returned_memories = []
             for message_dict in messages:
                 processed = process_message_for_memory(message_dict, metadata)
                 if processed is None:
                     continue
-                    
+
                 msg_content, per_msg_meta = processed
                 msg_embeddings = self.embedding_model.embed(msg_content, "add")
                 mem_id = self._create_memory(msg_content, msg_embeddings, per_msg_meta)
@@ -1167,7 +1168,7 @@ class AsyncMemory(MemoryBase):
         except Exception as e:
             logging.error(f"Error in new_retrieved_facts: {e}")
             new_retrieved_facts = []
-        
+
         if not new_retrieved_facts:
             logger.debug("No new facts retrieved from input. Skipping memory update LLM call.")
 
@@ -1210,12 +1211,13 @@ class AsyncMemory(MemoryBase):
     ):
         if not infer:
             from mem0.memory.utils import process_message_for_memory
+
             returned_memories = []
             for message_dict in messages:
                 processed = process_message_for_memory(message_dict, metadata)
                 if processed is None:
                     continue
-                    
+
                 msg_content, per_msg_meta = processed
                 msg_embeddings = await asyncio.to_thread(self.embedding_model.embed, msg_content, "add")
                 mem_id = await self._create_memory(msg_content, msg_embeddings, per_msg_meta)
@@ -1453,18 +1455,14 @@ class AsyncMemory(MemoryBase):
             "mem0.get_all", self, {"limit": limit, "keys": keys, "encoded_ids": encoded_ids, "sync_type": "async"}
         )
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_memories = executor.submit(self._get_all_from_vector_store, effective_filters, limit)
-            future_graph_entities = (
-                executor.submit(self.graph.get_all, effective_filters, limit) if self.enable_graph else None
+        if self.enable_graph:
+            all_memories_result, graph_entities_result = await asyncio.gather(
+                self._get_all_from_vector_store(effective_filters, limit),
+                asyncio.to_thread(self.graph.get_all, effective_filters, limit),
             )
-
-            concurrent.futures.wait(
-                [future_memories, future_graph_entities] if future_graph_entities else [future_memories]
-            )
-
-            all_memories_result = future_memories.result()
-            graph_entities_result = future_graph_entities.result() if future_graph_entities else None
+        else:
+            all_memories_result = await self._get_all_from_vector_store(effective_filters, limit)
+            graph_entities_result = None
 
         if self.enable_graph:
             return {"results": all_memories_result, "relations": graph_entities_result}
