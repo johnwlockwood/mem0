@@ -1205,7 +1205,7 @@ class AsyncMemory(MemoryBase):
         self,
         messages: list,
         metadata: dict,
-        filters: dict,
+        effective_filters: dict,
         infer: bool,
     ):
         if not infer:
@@ -1236,7 +1236,7 @@ class AsyncMemory(MemoryBase):
             retrieved_old_memory,
             temp_uuid_mapping,
             new_message_embeddings,
-        ) = await self._do_fact_retrieval(messages, filters)
+        ) = await self._do_fact_retrieval(messages, effective_filters)
         if new_retrieved_facts:
             new_memories_with_actions = await self._get_memory_actions(
                 retrieved_old_memory, new_retrieved_facts, new_message_embeddings, metadata
@@ -1248,10 +1248,13 @@ class AsyncMemory(MemoryBase):
         else:
             returned_memories = []
 
+        keys, encoded_ids = process_telemetry_filters(effective_filters)
         capture_event(
-            "mem0.add", self, {"version": self.api_version, "keys": list(filters.keys()), "sync_type": "async"}
+            "mem0.add",
+            self,
+            {"version": self.api_version, "keys": keys, "encoded_ids": encoded_ids, "sync_type": "async"},
         )
-
+        
         return returned_memories
 
     async def _generate_memory_actions_response(self, function_calling_prompt: str) -> str:
